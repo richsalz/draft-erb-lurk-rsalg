@@ -276,6 +276,8 @@ out to be difficult to integrate into existing TLS/SSL libraries.
 Should the lurk_request and lurk_response messages be padded out
 to eight-byte alignment?
 
+Should we use variant for the different request/response payloads?
+
 # Acknowledgements
 
 We acknowledge the cooperation of Charlie Gero and Phil Lisiecki of
