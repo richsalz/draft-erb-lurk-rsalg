@@ -105,7 +105,7 @@ the PRF function) and provide that.
 
 * The Server will choose a random ephemeral value, N, and provide a
 cryptographically-hashed value of (such as SHA256(N)) as its
-Server Random value. The Server sends N to KeyOwner which then 
+Server Random value. The Server sends N to KeyOwner which then
 computes the same hashed value and uses that hash as its input to the PRF.
 
 An attacker who later gains access to KeyOwner would be unable to derive the
@@ -156,6 +156,22 @@ Both Server and KeyOwner compute the following:
     server_random[0..3] = saved_time
 ~~~
 
+## Session Ticket Key Request
+A server that utilizes TLS session ticket keys must use a session ticket key
+based on a private value. In order to provide an additional private value as
+input to a session ticket KDF, the KeyOwner must support an additional operation.
+
+After receiving a request, the KeyOwner computes an HMAC over a server supplied salt
+and a fixed string using the private key for the certificate specified in the
+request as the hash key.
+
+The fixed string may be set by the KeyOwner, for example "LURK SESSION TICKET".
+
+~~~
+    session_ticket_secret = HMAC-SHA-256(private_key,
+                                         server_salt + fixed_string)
+~~~
+
 # LURK Message Formats
 
 The formats below are described using the TLS Presentation Language.
@@ -166,7 +182,7 @@ The following message header appears at the start of every message:
             one(1), (255)
         } Version
         enum {
-            request(0), response(1), (255)
+            request(0), session_ticket_request(1), response(2), (255)
         } Type
         struct {
             Version  version;
@@ -244,9 +260,31 @@ data
 : For rsalg requests, this contains the encrypted PRF. For server_kx
 signing reqeusts, this contains the key parameters to sign.
 
+## Session Ticket Request
+
+A session ticket key input request message looks like this:
+
+        struct {
+            lurk_msg_header  header;
+            uint64           id;
+            uint8            cert<32>;
+            uint8            server_salt<32>;
+        } lurk_session_ticket_request;
+
+id
+: A unique identifier to allow pipelining and match requests and responses.
+
+cert
+: The identifier for the keypair to be used in this request.
+This SHOULD be the SHA256 value of the public key.
+
+server_salt
+: A server supplied random salt.
+
+
 ## Response Message
 
-A response message looks like this:
+A response message, used by both request types, looks like this:
 
         enum {
             success(0), invalidParameters(1), certUnavailable(2),
@@ -266,6 +304,7 @@ data
 : For any status other than success, the data is ignored and MUST be NULL.
 For rsalg requests, the data contains the master secret.
 For server_kx requests, the data contains the signed hash.
+For session ticket key requests, the data contains the computed HMAC.
 
 # Open Issues
 
