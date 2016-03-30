@@ -157,15 +157,21 @@ Both Server and KeyOwner compute the following:
 ~~~
 
 ## Session Ticket Key Request
-A server that utilizes TLS session ticket keys must use a session ticket key
-based on a private value. In order to provide an additional private value as
-input to a session ticket KDF, the KeyOwner must support an additional operation.
 
-After receiving a request, the KeyOwner computes an HMAC over a server supplied salt
-and a fixed string using the private key for the certificate specified in the
-request as the hash key.
+A Server that supports TLS session tickets for multiple KeyOwners SHOULD
+ensure that the ticket encryption keys are secure in the face of various
+compromises. Using a hash of the private key as one of the inputs to the
+session ticket KDF ensures that the traffic for KeyOwner is protected
+against compromise of, or malicious behavior by, other input parts to the
+session ticket KDF. It also limits the extent to which compromise of a
+particular session ticket key effects the Server acting on behalf of
+multiple KeyOwners.
 
-The fixed string may be set by the KeyOwner, for example "LURK SESSION TICKET".
+After receiving a request, the KeyOwner computes an HMAC over a
+server-supplied salt and a fixed string using the private key for the
+certificate specified in the request as the hash key.
+
+The fixed string is set by the KeyOwner, for example "LURK SESSION TICKET".
 
 ~~~
     session_ticket_secret = HMAC-SHA-256(private_key,
