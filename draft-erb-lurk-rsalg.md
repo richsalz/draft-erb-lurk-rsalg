@@ -75,7 +75,7 @@ This protocol can support Client-Server communications from SSLv3 up through
 TLS 1.2.  (TLS 1.3 will have to be evaluated at a later date.)
 
 Past Client-Server communications must remain private in the event that
-access to the KeyOwner is compromised (Perfect Forward Secrecy). For Server
+a Server is compromised (Perfect Forward Secrecy). For Server
 Key Exchange signing requests, this is not an issue.  For RSA decryption
 requests used by the TLS_RSA_* cipher suites, the "RSALG" message exchanges
 described below provide PFS protection.
@@ -93,7 +93,9 @@ TLS 1.2 or later SHOULD be used.
 
 ## Server Key Exchange
 
-To be provided.
+A KeyOwner will sign requests on behalf of the Server for the signature
+required for the Server Key Exchange Message. This message includes
+the client and server random values and key parameters.
 
 ## RSALG
 
@@ -116,7 +118,7 @@ to compute the server random.
 
 ### Implementation Note -- Modified Bleichenbacher Attack
 
-If an attacker can gain access to the KeyOwner, they could mount a
+If an attacker can gain access to a Server, they could mount a
 Bleichenbacher attack against it (REF NEEDED).  The standard SSL/TLS defense
 against the Bleichenbacher attack (generating a string of random bytes)
 is not effective here, since an attacker could generate two requests with
@@ -130,6 +132,9 @@ using a private key as the hash key, to ensure that the output is a
 deterministic function of the input and cannot be calculated by the
 attacker. This private key must be globally unique per keypair, therefore
 the RSA private key being used to decrypt the PMS is an obvious choice.
+
+The PRF inputs to the HMAC-SHA-384 described above are the encrypted PMS,
+client version and server vesion.
 
 ### Implementation Note -- Hash Calculation
 
@@ -174,7 +179,7 @@ certificate specified in the request as the hash key.
 The fixed string is set by the KeyOwner, for example "LURK SESSION TICKET".
 
 ~~~
-    session_ticket_secret = HMAC-SHA-256(private_key,
+    session_ticket_secret = HMAC-SHA-384(private_key,
                                          server_salt + fixed_string)
 ~~~
 
@@ -200,7 +205,7 @@ version
 : The version of this protocol.
 
 type
-: The message type, either request or response. Details defined below.
+: The message type. Details defined below.
 
 length
 : Length of the entire message, including header, in bytes.
@@ -253,7 +258,7 @@ Note that for RSALG requests, this is actually the digested value of N.
 sig_hash_alg
 : For server_kx requests, this is the signature hash value that the Server
 will use (see RFC5246, section 7.4.1.4.1). For rsalg requests,
-this field is ignored and SHOULD be NULL.
+this field is ignored and SHOULD be NULL. TODO - TLSv1.3 considerations.
 
 prf_hash_alg
 : For rsalg requests, this identifies the PRF function to use. For
@@ -264,7 +269,7 @@ sighashalgo above, also need md5/sha1 combo value here.
 
 data
 : For rsalg requests, this contains the encrypted PRF. For server_kx
-signing reqeusts, this contains the key parameters to sign.
+signing requests, this contains the key parameters to sign.
 
 ## Session Ticket Request
 
@@ -274,7 +279,7 @@ A session ticket key input request message looks like this:
             lurk_msg_header  header;
             uint64           id;
             uint8            cert<32>;
-            uint8            server_salt<32>;
+            uint8            server_salt<48>;
         } lurk_session_ticket_request;
 
 id
@@ -298,7 +303,7 @@ A response message, used by both request types, looks like this:
         } ResponseStatus
         struct {
             lurk_msg_header  header;
-            RseponseStatus   status;
+            ResponseStatus   status;
             uint64           id;
             opaque           data<0..2^16-1>;
         } lurk_response;
