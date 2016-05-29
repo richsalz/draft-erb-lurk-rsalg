@@ -91,6 +91,12 @@ Communication between the Server and KeyOwner MUST be over a
 mutually-authenticated TLS connection that uses PFS key exchange.
 TLS 1.2 or later SHOULD be used.
 
+## Setup
+
+A Server can contact a KeyOwner at any time to request the state of the
+KeyOwner. When a Server is notified of a state change in a KeyOwner response
+message, it MUST then request the state of the KeyOwner.
+
 ## Server Key Exchange
 
 A KeyOwner will sign requests on behalf of the Server for the signature
@@ -134,7 +140,7 @@ attacker. This private key must be globally unique per keypair, therefore
 the RSA private key being used to decrypt the PMS is an obvious choice.
 
 The PRF inputs to the HMAC-SHA-384 described above are the encrypted PMS,
-client version and server vesion.
+client version and server version.
 
 ### Implementation Note -- Hash Calculation
 
@@ -193,7 +199,8 @@ The following message header appears at the start of every message:
             one(1), (255)
         } Version
         enum {
-            request(0), session_ticket_request(1), response(2), (255)
+            setup_request(0), setup_response(1),
+            request(2), session_ticket_request(3), response(4), (255)
         } Type
         struct {
             Version  version;
@@ -209,6 +216,57 @@ type
 
 length
 : Length of the entire message, including header, in bytes.
+
+## Setup Response Message
+
+A setup request message, requesting the state of the KeyOwner looks like this:
+
+        struct {
+            lurk_msg_header  header;
+            uint64           id;
+        } setup_request;
+
+id
+: A unique identifier to allow pipelining and match requests and responses.
+
+## Setup Response Message
+
+A setup response message, returning the state of the KeyOwner looks like this:
+
+        struct {
+            uint8  purpose<32>;
+            opaque ASN.1Cert<1..2^24-1>;
+        } certificate;
+        struct {
+            lurk_msg_header  header;
+            uint64           id;
+            SignatureAndHashAlgorithm
+                             supported_signature_algorithms<2..2^16-2>;
+            certificate      certificate_list<0..2^24-1>;
+            uint8            state<32>;
+        } setup_response;
+
+id
+: A unique identifier to allow pipelining and match requests and responses.
+
+supported_signature_algorithms
+: A list of supported signature hash algorithms that the KeyOwner supports
+  (see RFC5246, section 7.4.1.4.1).
+TODO: TLSv1.3 considerations
+
+certificate_list
+: A list of certificate that are supported by the KeyOwner. The purpose field
+is a value that MUST be pre-configured by the Server and KeyOwner so a Server
+can have context of where to use the corresponding ASN.1Cert. An example pre-configuration
+of the purpose field is:
+purpose = sha256(hostname)
+
+state
+: A hash of the current state of the server. A KeyOwner MUST provide this value
+in every response message and MUST update the value to let a Server know to
+send a setup_request message. This value MUST be consistant across multiple KeyOwners
+with identical configurations. An example of this value:
+state = sha256(supported_signature_algorithms + certificate_list)
 
 ## Request Message
 
@@ -305,11 +363,17 @@ A response message, used by both request types, looks like this:
             lurk_msg_header  header;
             ResponseStatus   status;
             uint64           id;
+            uint8            state<32>;
             opaque           data<0..2^16-1>;
         } lurk_response;
 
 id
 : The request id for which this is the response.
+
+state
+: A 32 byte tag identifying the current state of the server. This is expected
+to be the same value found in the setup_response message. If this value is different
+the Server MUST send a setup_request message.
 
 data
 : For any status other than success, the data is ignored and MUST be NULL.
