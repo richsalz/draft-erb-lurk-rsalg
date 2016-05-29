@@ -1,7 +1,7 @@
 ---
 title: "A PFS-preserving protocol for LURK"
 abbrev: draft-erb-lurk-rsalg
-docname: draft-erb-lurk-rsalg-00
+docname: draft-erb-lurk-rsalg-01
 date: 2016-05-28
 category: std
 ipr: trust200902
